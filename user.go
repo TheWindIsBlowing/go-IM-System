@@ -53,9 +53,22 @@ func (user *User) Offline() {
 	user.server.BroadCast(user, "offline")
 }
 
+// 发送消息 测试增、删、改、查等功能
+func (user *User) SendMsg(msg string) {
+	user.conn.Write([]byte(msg))
+}
+
 // 用户处理消息的业务
 func (user *User) DoMessage(msg string) {
-	user.server.BroadCast(user, msg)
+	// 查询在线用户
+	if msg == "who" {
+		for _, u := range user.server.OnlineMap {
+			sendMsg := "[" + u.Addr + "]" + u.Name + ":" + "online...\n"
+			user.SendMsg(sendMsg)
+		}
+	} else {
+		user.server.BroadCast(user, msg)
+	}
 }
 
 // 监听用户 channel C，一旦有消息，就向该用户的客户端发送
