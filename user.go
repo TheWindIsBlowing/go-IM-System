@@ -35,7 +35,7 @@ func NewUser(conn net.Conn, server *Server) *User {
 func (user *User) Online() {
 	// 用户上线，加入OnlineMap
 	user.server.mapLock.Lock()
-	user.server.OnlineMap[user.Name] = user
+	user.server.OnlineMap[user.Addr] = user
 	user.server.mapLock.Unlock()
 
 	// 广播当前用户上线消息
@@ -58,6 +58,16 @@ func (user *User) SendMsg(msg string) {
 	user.conn.Write([]byte(msg))
 }
 
+// 检查名字是否被使用
+func (user *User) checkNameIsUsed(newName string) bool {
+	for _, u := range user.server.OnlineMap {
+		if u.Name == newName {
+			return true
+		}
+	}
+	return false
+}
+
 // 用户处理消息的业务
 func (user *User) DoMessage(msg string) {
 	// 查询在线用户
@@ -65,6 +75,16 @@ func (user *User) DoMessage(msg string) {
 		for _, u := range user.server.OnlineMap {
 			sendMsg := "[" + u.Addr + "]" + u.Name + ":" + "online...\n"
 			user.SendMsg(sendMsg)
+		}
+	} else if len(msg) > 7 && msg[:7] == "rename|" { // 修改用户名
+		// 消息格式 rename|李四
+		newName := msg[7:]
+
+		if user.checkNameIsUsed(newName) {
+			user.SendMsg(newName + " has already used...\n")
+		} else {
+			user.Name = newName
+			user.SendMsg("rename success new name: " + newName + "\n")
 		}
 	} else {
 		user.server.BroadCast(user, msg)
