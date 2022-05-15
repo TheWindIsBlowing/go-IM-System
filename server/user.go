@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"strings"
 )
 
 type User struct {
@@ -58,14 +59,14 @@ func (user *User) SendMsg(msg string) {
 	user.conn.Write([]byte(msg))
 }
 
-// 检查名字是否被使用
-func (user *User) checkNameIsUsed(newName string) bool {
+// 通过名字获取user
+func (user *User) getUserByName(newName string) *User {
 	for _, u := range user.server.OnlineMap {
 		if u.Name == newName {
-			return true
+			return u
 		}
 	}
-	return false
+	return nil
 }
 
 // 用户处理消息的业务
@@ -80,11 +81,24 @@ func (user *User) DoMessage(msg string) {
 		// 消息格式 rename|李四
 		newName := msg[7:]
 
-		if user.checkNameIsUsed(newName) {
+		if user.getUserByName(newName) != nil {
 			user.SendMsg(newName + " has already used...\n")
 		} else {
 			user.Name = newName
 			user.SendMsg("rename success new name: " + newName + "\n")
+		}
+	} else if len(msg) > 4 && msg[:3] == "to|" {
+		// 消息格式 to|李四|消息内容
+		splitStrs := strings.Split(msg, "|")
+		if len(splitStrs) != 3 {
+			user.SendMsg("pattern command is wrong，use pattern like: \"to|zhang san|hello\"\n")
+			return
+		}
+		u := user.getUserByName(splitStrs[1])
+		if u != nil {
+			u.SendMsg(user.Name + ":" + splitStrs[2] + "\n")
+		} else {
+			user.SendMsg("no user called " + splitStrs[1] + "\n")
 		}
 	} else {
 		user.server.BroadCast(user, msg)
