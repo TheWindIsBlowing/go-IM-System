@@ -9,10 +9,12 @@ type User struct {
 	Addr string
 	C    chan string
 	conn net.Conn
+
+	server *Server
 }
 
 // 创建一个用户
-func NewUser(conn net.Conn) *User {
+func NewUser(conn net.Conn, server *Server) *User {
 	userAddr := conn.RemoteAddr().String()
 
 	user := &User{
@@ -20,6 +22,8 @@ func NewUser(conn net.Conn) *User {
 		Addr: userAddr,
 		C:    make(chan string),
 		conn: conn,
+
+		server: server,
 	}
 
 	go user.ListenMessage()
@@ -27,6 +31,34 @@ func NewUser(conn net.Conn) *User {
 	return user
 }
 
+// 用户上线业务
+func (user *User) Online() {
+	// 用户上线，加入OnlineMap
+	user.server.mapLock.Lock()
+	user.server.OnlineMap[user.Name] = user
+	user.server.mapLock.Unlock()
+
+	// 广播当前用户上线消息
+	user.server.BroadCast(user, "online")
+}
+
+// 用户下线业务
+func (user *User) Offline() {
+	// 用户下线，从OnlineMap中移除
+	user.server.mapLock.Lock()
+	delete(user.server.OnlineMap, user.Name)
+	user.server.mapLock.Unlock()
+
+	// 广播当前用户下线消息
+	user.server.BroadCast(user, "offline")
+}
+
+// 用户处理消息的业务
+func (user *User) DoMessage(msg string) {
+	user.server.BroadCast(user, msg)
+}
+
+// 监听用户 channel C，一旦有消息，就向该用户的客户端发送
 func (user *User) ListenMessage() {
 	for {
 		msg := <-user.C
